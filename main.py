@@ -1,10 +1,9 @@
 # Jurito MVP - Backend (FastAPI + OpenAI + PyMuPDF)
-# Versão inicial: rota /analisar que recebe contrato e responde sumário
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from openai import OpenAI
 import fitz  # PyMuPDF
-import openai
 import os
 
 app = FastAPI()
@@ -22,7 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Instancia o client OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 PROMPT_BASE = """
 Você é um especialista jurídico. Leia o contrato abaixo e extraia as seguintes informações:
@@ -50,7 +50,7 @@ async def analisar_contrato(file: UploadFile = File(...)):
 
     prompt_final = PROMPT_BASE + "\n\n" + texto[:6000]  # corta para evitar limite de tokens
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "Você é um advogado especialista em contratos."},
@@ -58,5 +58,5 @@ async def analisar_contrato(file: UploadFile = File(...)):
         ]
     )
 
-    resultado = response["choices"][0]["message"]["content"]
+    resultado = response.choices[0].message.content
     return {"resumo": resultado}
