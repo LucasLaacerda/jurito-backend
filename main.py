@@ -1,18 +1,14 @@
-# Jurito MVP - Backend (FastAPI + OpenAI + PyMuPDF)
+# Jurito Viagens - Backend (FastAPI + OpenAI)
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from openai import OpenAI
-import fitz  # PyMuPDF
 import os
 
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"greeting": "Hello, World!", "message": "Welcome to FastAPI!"}
-
-# CORS para frontend local
+# CORS para frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,39 +20,51 @@ app.add_middleware(
 # Instancia o client OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-PROMPT_BASE = """
-Você é um especialista jurídico. Leia o contrato abaixo e extraia as seguintes informações:
-1. Quem são as partes envolvidas?
-2. Quais as obrigações de cada parte?
-3. Qual é o prazo e data de término?
-4. Há multas ou penalidades? Quais?
-5. Quais cláusulas exigem atenção?
-6. Alerta se houver lacunas importantes ou termos incomuns.
+class VooData(BaseModel):
+    relato: str
+    nome: str
+    cpf: str
+    email: str
+    cia: str
+    voo: str
+    origem: str
+    destino: str
+    data_voo: str
+    oferecido: list[str]
+    valor: str
+    cidade_estado: str
 
-Formato da resposta:
-- Partes:
-- Obrigações:
-- Prazos:
-- Multas:
-- Cláusulas sensíveis:
-- Alertas:
+PETICAO_PROMPT = """
+Você é um advogado especialista em direitos do consumidor e legislação da ANAC. Gere uma petição inicial para o Juizado Especial Cível com base nas informações abaixo:
+
+Dados do passageiro:
+- Nome: {nome}
+- CPF: {cpf}
+- E-mail: {email}
+- Companhia aérea: {cia}
+- Número do voo: {voo}
+- Aeroporto de origem: {origem}
+- Aeroporto de destino: {destino}
+- Data e horário do voo: {data_voo}
+- Descrição do problema: {relato}
+- O que foi (ou não foi) oferecido: {oferecido}
+- Valor desejado: R$ {valor}
+- Cidade onde o processo será aberto: {cidade_estado}
+
+Com base na Resolução 400 da ANAC, fundamente os direitos violados e redija a petição inicial com uma linguagem clara, objetiva e jurídica.
 """
 
-@app.post("/analisar")
-async def analisar_contrato(file: UploadFile = File(...)):
-    conteudo = await file.read()
-    with fitz.open(stream=conteudo, filetype="pdf") as doc:
-        texto = "\n".join([page.get_text() for page in doc])
-
-    prompt_final = PROMPT_BASE + "\n\n" + texto[:6000]  # corta para evitar limite de tokens
+@app.post("/gerar-peticao")
+async def gerar_peticao(data: VooData):
+    prompt = PETICAO_PROMPT.format(**data.dict())
 
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "Você é um advogado especialista em contratos."},
-            {"role": "user", "content": prompt_final}
+            {"role": "system", "content": "Você é um advogado especialista em processos de passageiros."},
+            {"role": "user", "content": prompt}
         ]
     )
 
     resultado = response.choices[0].message.content
-    return {"resumo": resultado}
+    return {"peticao": resultado}
