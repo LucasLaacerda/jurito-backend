@@ -1,4 +1,4 @@
-# Jurito Viagens - Backend (FastAPI + OpenAI)
+# Jurito Viagens Pro - Backend (FastAPI + OpenAI)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,16 +8,14 @@ import os
 
 app = FastAPI()
 
-# CORS para frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://jurito-frontend.vercel.app"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Instancia o client OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class VooData(BaseModel):
@@ -34,37 +32,48 @@ class VooData(BaseModel):
     valor: str
     cidade_estado: str
 
-PETICAO_PROMPT = """
-Você é um advogado especialista em direitos do consumidor e legislação da ANAC. Gere uma petição inicial para o Juizado Especial Cível com base nas informações abaixo:
+ANALISE_PROMPT = """
+Você é um advogado especialista em direitos do consumidor e voos. Analise o seguinte caso com base nas informações fornecidas. Retorne os seguintes blocos, separados e formatados:
 
-Dados do passageiro:
+1. **Resumo do Caso**: Resuma o que aconteceu de forma clara e objetiva.
+
+2. **Regulações Aplicáveis**: Liste as leis e regras que se aplicam ao caso (ex: ANAC, Código do Consumidor).
+
+3. **Análise de Viabilidade**: Diga se o caso é forte e por quê. Dê uma nota de viabilidade (0 a 100%) com base nas chances reais de sucesso.
+
+4. **Potencial de Compensação**: Com base nas regulações, quanto a pessoa pode solicitar (valor estimado).
+
+5. **Plano de Ação**: Explique quais passos ela pode seguir (ex: carta, juizado, Procon etc).
+
+6. **Petição Inicial**: Caso seja viável, gere a minuta de uma petição inicial para o Juizado Especial Cível, com base nas informações abaixo.
+
+Informações:
 - Nome: {nome}
 - CPF: {cpf}
-- E-mail: {email}
+- Email: {email}
 - Companhia aérea: {cia}
 - Número do voo: {voo}
-- Aeroporto de origem: {origem}
-- Aeroporto de destino: {destino}
-- Data e horário do voo: {data_voo}
-- Descrição do problema: {relato}
-- O que foi (ou não foi) oferecido: {oferecido}
+- Origem: {origem}
+- Destino: {destino}
+- Data do voo: {data_voo}
+- O que foi oferecido: {oferecido}
 - Valor desejado: R$ {valor}
-- Cidade onde o processo será aberto: {cidade_estado}
+- Cidade onde abrirá processo: {cidade_estado}
+- Relato: {relato}
 
-Com base na Resolução 400 da ANAC, fundamente os direitos violados e redija a petição inicial com uma linguagem clara, objetiva e jurídica.
+Organize a resposta com subtítulos e clareza.
 """
 
-@app.post("/gerar-peticao")
-async def gerar_peticao(data: VooData):
-    prompt = PETICAO_PROMPT.format(**data.dict())
+@app.post("/avaliar-caso")
+async def avaliar_caso(data: VooData):
+    prompt = ANALISE_PROMPT.format(**data.dict())
 
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "Você é um advogado especialista em processos de passageiros."},
+            {"role": "system", "content": "Você é um advogado que atua com voos, ANAC e direito do consumidor."},
             {"role": "user", "content": prompt}
         ]
     )
 
-    resultado = response.choices[0].message.content
-    return {"peticao": resultado}
+    return {"resposta": response.choices[0].message.content}
