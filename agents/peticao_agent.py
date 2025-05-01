@@ -1,5 +1,5 @@
 from models import VooData
-from common import chamar_openai
+from utils.common import chamar_openai
 
 SYSTEM_MESSAGE = (
     "Você é um advogado com vasta experiência na redação de petições iniciais. "
