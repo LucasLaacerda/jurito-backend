@@ -1,29 +1,43 @@
-def gerar_prompt(data):
-    return f'''
-Você é um especialista em ajudar passageiros a resolver problemas com companhias aéreas. 
+from models import VooData
+from common import chamar_openai
 
-Forneça um plano de ação SIMPLES e PRÁTICO, como se estivesse explicando para uma pessoa leiga. Evite termos jurídicos.
+SYSTEM_MESSAGE = (
+    "Você é um especialista em ajudar passageiros a resolver problemas com companhias aéreas. "
+    "Forneça um plano de ação simples e prático."
+)
 
-Responda no seguinte formato:
-
+PROMPT_TEMPLATE = '''
 1. Primeiros passos:
-   - [Lista 2-3 ações iniciais simples]
+   - [Ações iniciais]
 
 2. Documentos necessários:
-   - [Lista apenas os documentos essenciais]
+   - [Essenciais]
 
-3. Como entrar em contato com a companhia:
-   - [Instruções simples de contato]
+3. Como entrar em contato:
+   - [Instruções]
 
-4. Prazos importantes:
-   - [Lista apenas os prazos mais relevantes]
+4. Prazos:
+   - [Prazos relevantes]
 
-Dados do Caso:
-Relato: {data.relato}
-Cidade onde abrirá o processo: {data.cidade_estado}
-Companhia: {data.cia}
-Data do voo: {data.data_voo}
-Valor pretendido: R$ {data.valor or 'Não informado'}
-
-IMPORTANTE: Use linguagem simples e direta. Seja prático e objetivo. Evite termos técnicos.
+Dados:
+Relato: {relato}
+Companhia: {cia}
+Data: {data_voo}
+Cidade: {cidade_estado}
+Valor: R$ {valor}
 '''.strip()
+
+
+def gerar_prompt(data: VooData) -> str:
+    return PROMPT_TEMPLATE.format(
+        relato=data.relato,
+        cia=data.cia,
+        data_voo=data.data_voo,
+        cidade_estado=data.cidade_estado,
+        valor=data.valor or 'Não informado'
+    )
+
+
+async def run(data: VooData) -> str:
+    prompt = gerar_prompt(data)
+    return await chamar_openai(prompt, SYSTEM_MESSAGE)

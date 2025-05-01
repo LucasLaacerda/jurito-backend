@@ -1,18 +1,37 @@
-def gerar_prompt(data):
-    return f'''
-Você é um especialista em compensações por problemas em voos. Forneça APENAS os valores em reais (R$) que o passageiro pode receber, no seguinte formato:
+from models import VooData
+from common import chamar_openai
 
+SYSTEM_MESSAGE = (
+    "Você é especialista em compensações por problemas em voos. "
+    "Retorne apenas valores em R$ no formato mínimo, médio e máximo."
+)
+
+PROMPT_TEMPLATE = '''
 Valor mínimo: R$ X
 Valor médio: R$ Y
 Valor máximo: R$ Z
 
-Dados do Caso:
-Relato: {data.relato}
-Oferecido pela companhia: {", ".join(data.oferecido)}
-Valor desejado pelo passageiro: R$ {data.valor or 'Não informado'}
-Origem: {data.origem}
-Destino: {data.destino}
-Data do voo: {data.data_voo}
-
-IMPORTANTE: Retorne APENAS os valores, sem nenhuma explicação ou texto adicional.
+Dados:
+Relato: {relato}
+Oferecido: {oferecido}
+Origem: {origem}
+Destino: {destino}
+Data: {data_voo}
+Valor desejado: R$ {valor}
 '''.strip()
+
+
+def gerar_prompt(data: VooData) -> str:
+    return PROMPT_TEMPLATE.format(
+        relato=data.relato,
+        oferecido=", ".join(data.oferecido),
+        origem=data.origem,
+        destino=data.destino,
+        data_voo=data.data_voo,
+        valor=data.valor or 'Não informado'
+    )
+
+
+async def run(data: VooData) -> str:
+    prompt = gerar_prompt(data)
+    return await chamar_openai(prompt, SYSTEM_MESSAGE)

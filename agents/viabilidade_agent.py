@@ -1,19 +1,26 @@
-def gerar_prompt(data):
-    return f'''
-Você é um advogado especialista em direito do consumidor e transporte aéreo. 
+from models import VooData
+from common import chamar_openai
 
-Analise o caso abaixo e forneça APENAS a porcentagem de chance de sucesso do passageiro em obter a compensação, no seguinte formato:
+SYSTEM_MESSAGE = (
+    "Você é um advogado especialista em direito do consumidor e transporte aéreo. "
+    "Forneça APENAS a chance de sucesso em porcentagem."
+)
 
-Chance de sucesso: X%
+PROMPT_TEMPLATE = 'Chance de sucesso: X%'
 
-Dados do Caso:
-Relato: {data.relato}
-Companhia: {data.cia}
-Data do voo: {data.data_voo}
-Origem: {data.origem}
-Destino: {data.destino}
-Oferecido: {", ".join(data.oferecido)}
-Valor pretendido: R$ {data.valor or 'Não informado'}
 
-IMPORTANTE: Retorne APENAS a porcentagem, sem nenhuma explicação ou texto adicional.
-'''.strip()
+def gerar_prompt(data: VooData) -> str:
+    return (
+        f"Chance de sucesso:"
+        f"Dados do Caso:"
+        f"Relato: {data.relato}"
+        f"Companhia: {data.cia}"
+        f"Voo: {data.voo} ({data.origem}->{data.destino} em {data.data_voo})"
+        f"Oferecido: {', '.join(data.oferecido)}"
+        f"Valor: R$ {data.valor or 'Não informado'}"
+    )
+
+
+async def run(data: VooData) -> str:
+    prompt = gerar_prompt(data)
+    return await chamar_openai(prompt, SYSTEM_MESSAGE)

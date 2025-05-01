@@ -1,27 +1,44 @@
-def gerar_prompt(data):
-    return f'''
-Você é um especialista em direitos do passageiro aéreo. Explique de forma SIMPLES e DIRETA quais são os direitos do passageiro neste caso específico.
+from models import VooData
+from common import chamar_openai
 
-Use linguagem clara e acessível, como se estivesse explicando para uma pessoa leiga. Evite termos jurídicos complexos.
+SYSTEM_MESSAGE = (
+    "Você é um especialista em direitos do passageiro aéreo. "
+    "Explique de forma simples e direta os direitos do passageiro."
+)
 
-Responda no seguinte formato:
-
+PROMPT_TEMPLATE = '''
 1. Direitos do passageiro:
-   - [Lista os direitos principais de forma simples]
+   - [Lista principal]
 
 2. O que a companhia deve fazer:
-   - [Lista as obrigações da companhia de forma simples]
+   - [Obrigações]
 
 3. Documentos necessários:
-   - [Lista apenas os documentos essenciais]
+   - [Essenciais]
 
-Dados do Caso:
-Relato: {data.relato}
-Origem: {data.origem}
-Destino: {data.destino}
-Data do voo: {data.data_voo}
-Companhia: {data.cia}
-Oferecido: {", ".join(data.oferecido)}
-
-IMPORTANTE: Use linguagem simples e direta, evitando termos técnicos. Seja breve e objetivo.
+Dados:
+Relato: {relato}
+Origem: {origem}
+Destino: {destino}
+Voo: {voo}
+Data: {data_voo}
+Companhia: {cia}
+Oferecido: {oferecido}
 '''.strip()
+
+
+def gerar_prompt(data: VooData) -> str:
+    return PROMPT_TEMPLATE.format(
+        relato=data.relato,
+        origem=data.origem,
+        destino=data.destino,
+        voo=data.voo,
+        data_voo=data.data_voo,
+        cia=data.cia,
+        oferecido=", ".join(data.oferecido)
+    )
+
+
+async def run(data: VooData) -> str:
+    prompt = gerar_prompt(data)
+    return await chamar_openai(prompt, SYSTEM_MESSAGE)

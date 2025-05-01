@@ -1,12 +1,11 @@
-# Jurito Viagens Pro - Backend (FastAPI + OpenAI)
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from models import VooData, RespostaAgente
+from utils.utils import parse_comp, parse_percentage
 from openai import OpenAI
 import os
-from typing import Optional, Dict, Any
 import json
+import asyncio
 
 # Imports dos agents
 from agents import (
@@ -14,7 +13,8 @@ from agents import (
     regulacoes_agent,
     viabilidade_agent,
     compensacao_agent,
-    acao_agent
+    acao_agent,
+    peticao_agent
 )
 
 app = FastAPI(
@@ -32,27 +32,6 @@ app.add_middleware(
 )
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Modelo de dados recebidos
-class VooData(BaseModel):
-    relato: str
-    nome: str
-    cpf: str
-    email: str
-    cia: str
-    voo: str
-    origem: str
-    destino: str
-    data_voo: str
-    oferecido: list[str]
-    valor: Optional[str] = None
-    cidade_estado: str
-
-# Modelo de resposta padronizada
-class RespostaAgente(BaseModel):
-    status: str
-    dados: Dict[str, Any]
-    mensagem: Optional[str] = None
 
 async def processar_resposta_agente(prompt: str, system_message: str) -> RespostaAgente:
     try:
@@ -119,17 +98,37 @@ async def gerar_plano_acao(data: VooData):
     )
 
 # Rota para análise completa
-@app.post("/avaliar-caso-completo", response_model=Dict[str, RespostaAgente])
-async def avaliar_caso_completo(data: VooData):
-    try:
-        resultados = {
-            "resumo": await gerar_resumo(data),
-            "regulacoes": await avaliar_regulacoes(data),
-            "viabilidade": await avaliar_viabilidade(data),
-            "compensacao": await calcular_compensacao(data),
-            "plano_acao": await gerar_plano_acao(data)
+@app.post("/avaliar-caso-completo")
+async def avaliar_caso_completo(data: VooData) -> dict:
+    try:  
+        # Executa em paralelo
+        resumo, regulacoes, viab, comp, plano = await asyncio.gather(
+            resumo_agent.run(data),
+            regulacoes_agent.run(data),
+            viabilidade_agent.run(data),
+            compensacao_agent.run(data),
+            acao_agent.run(data),
+        )
+        # Extrai valores de compensacao
+        min_c, med_c, max_c = map(parse_comp, comp)
+        # Gera petição
+        peticao = await peticao_agent.run(
+            data,
+            resumo,
+            regulacoes,
+            int(parse_percentage(viab)),
+            min_c,
+            med_c,
+            max_c
+        )
+        return {
+            "resumo":        {"resposta": resumo},
+            "regulacoes":    {"resposta": regulacoes},
+            "viabilidade":   {"resposta": viab},
+            "compensacao":   {"resposta": comp},
+            "plano_acao":    {"resposta": plano},
+            "peticao":       {"resposta": peticao}
         }
-        return resultados
     except Exception as e:
         raise HTTPException(
             status_code=500,
